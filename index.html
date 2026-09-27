@@ -23,11 +23,18 @@
                     <p class="eyebrow">BOOKMARK</p>
                     <h1 class="widget-title">Lids</h1>
                 </div>
-                <button class="load-products" type="button">
-                    <span class="button-icon" aria-hidden="true">&#8635;</span>
-                    <span>Load products</span>
-                </button>
+                <div class="widget-actions">
+                    <button class="test-number-button" type="button">Generate test number</button>
+                    <button class="load-products" type="button">
+                        <span class="button-icon" aria-hidden="true">&#8635;</span>
+                        <span>Load products</span>
+                    </button>
+                </div>
             </header>
+            <section class="number-test" aria-label="Random number button test">
+                <span class="number-test-label">TEST NUMBER</span>
+                <output class="test-number-output" aria-live="polite">No number generated</output>
+            </section>
             <p class="status" role="status" aria-live="polite">Waiting for dashboard initialization...</p>
             <ol class="debug-log" aria-label="Widget progress log" aria-live="polite">
                 <li class="debug-entry">Waiting for the dashboard onLoad event.</li>

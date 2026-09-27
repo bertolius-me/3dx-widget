@@ -276,8 +276,16 @@
 
     window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root) {
         var button = root.querySelector(".load-products");
+        var testNumberButton = root.querySelector(".test-number-button");
+        var testNumberOutput = root.querySelector(".test-number-output");
 
         setStatus(root, "Widget initialized. Ready to load products.");
+
+        testNumberButton.addEventListener("click", function () {
+            var number = String(Math.floor(Math.random() * 9000000000) + 1000000000);
+            testNumberOutput.textContent = number;
+            setStatus(root, "Test button clicked. Generated a 10-digit number.");
+        });
 
         button.addEventListener("click", function () {
             button.disabled = true;

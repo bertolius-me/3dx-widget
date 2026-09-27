@@ -34,6 +34,13 @@ body {
     border-bottom: 1px solid #d9e0dd;
 }
 
+.widget-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 .eyebrow {
     margin: 0 0 4px;
     color: #557268;
@@ -68,6 +75,16 @@ button:hover {
     background: #105941;
 }
 
+.test-number-button {
+    border-color: #6c7973;
+    background: #ffffff;
+    color: #34433b;
+}
+
+.test-number-button:hover {
+    background: #e8eeea;
+}
+
 button:focus-visible {
     outline: 3px solid #93c8b6;
     outline-offset: 2px;
@@ -93,6 +110,32 @@ button:disabled {
 
 .status[data-state="error"] {
     color: #a3332a;
+}
+
+.number-test {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-left: 3px solid #176b53;
+    background: #e9eeeb;
+}
+
+.number-test-label {
+    flex: 0 0 auto;
+    color: #557268;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.test-number-output {
+    overflow-wrap: anywhere;
+    color: #202a31;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
 }
 
 .debug-log {
