@@ -17,13 +17,13 @@
         </widget:preferences>
     </head>
     <body>
-        <main class="widget" aria-labelledby="widget-title">
+        <main class="widget" aria-label="Lids Physical Products">
             <header class="widget-header">
                 <div>
                     <p class="eyebrow">BOOKMARK</p>
-                    <h1 id="widget-title">Lids</h1>
+                    <h1 class="widget-title">Lids</h1>
                 </div>
-                <button id="load-products" type="button">
+                <button class="load-products" type="button">
                     <span class="button-icon" aria-hidden="true">&#8635;</span>
                     <span>Load products</span>
                 </button>
@@ -38,8 +38,16 @@
                     return;
                 }
 
-                require(["DS/WAFData/WAFData", "DS/i3DXCompassServices/i3DXCompassServices"], function (WAFData, i3DXCompassServices) {
-                    window.initializeLidsWidget(WAFData, i3DXCompassServices, widget.getValue("x3dPlatformId"), widget.getValue("SecurityContext"));
+                widget.addEvent("onLoad", function () {
+                    require(["DS/WAFData/WAFData", "DS/i3DXCompassServices/i3DXCompassServices"], function (WAFData, i3DXCompassServices) {
+                        window.initializeLidsWidget(
+                            WAFData,
+                            i3DXCompassServices,
+                            widget.getValue("x3dPlatformId"),
+                            widget.getValue("SecurityContext"),
+                            widget.body
+                        );
+                    });
                 });
             }());
         </script>

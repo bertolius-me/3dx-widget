@@ -145,8 +145,8 @@
         return item.name || item.title || item.label || item.physicalid || item.id || "Unnamed Physical Product";
     }
 
-    function renderProducts(products) {
-        var list = document.getElementById("products");
+    function renderProducts(root, products) {
+        var list = root.querySelector(".products");
         list.replaceChildren();
 
         products.forEach(function (product) {
@@ -165,8 +165,8 @@
         });
     }
 
-    function setStatus(message, state) {
-        var status = document.getElementById("status");
+    function setStatus(root, message, state) {
+        var status = root.querySelector(".status");
         status.textContent = message;
         status.dataset.state = state || "";
     }
@@ -206,20 +206,20 @@
         return contents.filter(isPhysicalProduct).map(normalizeProduct);
     }
 
-    window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext) {
-        var button = document.getElementById("load-products");
+    window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root) {
+        var button = root.querySelector(".load-products");
 
         button.addEventListener("click", function () {
             button.disabled = true;
-            renderProducts([]);
+            renderProducts(root, []);
 
             if (!securityContext || !securityContext.trim()) {
-                setStatus("Set the Security Context preference before loading products.", "error");
+                setStatus(root, "Set the Security Context preference before loading products.", "error");
                 button.disabled = false;
                 return;
             }
 
-            setStatus("Connecting to 3DSpace...");
+            setStatus(root, "Connecting to 3DSpace...");
 
             compassServices.getServiceUrl({
                 serviceName: "3DSpace",
@@ -227,17 +227,17 @@
                 onComplete: function (serviceUrl) {
                     if (!serviceUrl || serviceUrl === "undefined") {
                         button.disabled = false;
-                        setStatus("Could not resolve the 3DSpace service for this platform.", "error");
+                        setStatus(root, "Could not resolve the 3DSpace service for this platform.", "error");
                         return;
                     }
 
-                    setStatus("Loading Physical Products from Lids...");
+                    setStatus(root, "Loading Physical Products from Lids...");
                     loadProducts(WAFData, serviceUrl, securityContext.trim()).then(function (products) {
-                        renderProducts(products);
-                        setStatus(products.length + (products.length === 1 ? " Physical Product" : " Physical Products") + " found in Lids.");
+                        renderProducts(root, products);
+                        setStatus(root, products.length + (products.length === 1 ? " Physical Product" : " Physical Products") + " found in Lids.");
                     }).catch(function (error) {
-                        renderProducts([]);
-                        setStatus(describeError(error), "error");
+                        renderProducts(root, []);
+                        setStatus(root, describeError(error), "error");
                     }).finally(function () {
                         button.disabled = false;
                     });
