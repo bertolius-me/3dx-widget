@@ -21,4 +21,4 @@ The widget needs an authenticated, trusted dashboard session and permission to r
 
 ## PDF Export
 
-PDF export is generated in the browser from the loaded product data using locally bundled jsPDF 4.2.1 and jsPDF-AutoTable 5.0.8. The PDF uses a landscape table with product metadata, wrapped descriptions, a repeated report heading, and page numbers. No CDN or server-side PDF service is required. The corresponding MIT license texts are included in `scripts/vendor`.
+PDF export is generated in the browser from the loaded product data using locally bundled jsPDF 4.2.1 and jsPDF-AutoTable 5.0.8. The PDF uses a landscape table with product metadata, wrapped descriptions, a repeated report heading, and page numbers. No third-party CDN or server-side PDF service is required. The RequireJS loader points to the published GitHub Pages asset base (`https://bertolius-me.github.io/3dx-widget/`) so 3DEXPERIENCE's `/api/widget/` proxy path is not used for the vendor files. Update that base URL in `index.html` if the widget is hosted elsewhere. The corresponding MIT license texts are included in `scripts/vendor`.

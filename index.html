@@ -37,8 +37,9 @@
                     }, 30000);
 
                     try {
-                        var jsPdfUrl = new URL("scripts/vendor/jspdf.umd.min.js", document.baseURI).href;
-                        var autoTableUrl = new URL("scripts/vendor/jspdf.plugin.autotable.min.js", document.baseURI).href;
+                        var widgetAssetBaseUrl = "https://bertolius-me.github.io/3dx-widget/";
+                        var jsPdfUrl = new URL("scripts/vendor/jspdf.umd.min.js", widgetAssetBaseUrl).href;
+                        var autoTableUrl = new URL("scripts/vendor/jspdf.plugin.autotable.min.js", widgetAssetBaseUrl).href;
                         require([
                             "DS/WAFData/WAFData",
                             "DS/i3DXCompassServices/i3DXCompassServices",
