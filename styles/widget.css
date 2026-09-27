@@ -87,11 +87,34 @@ button:disabled {
     margin: 14px 0 10px;
     color: #5d6965;
     font-size: 13px;
+    font-weight: 600;
     line-height: 1.45;
 }
 
 .status[data-state="error"] {
     color: #a3332a;
+}
+
+.debug-log {
+    max-height: 132px;
+    overflow: auto;
+    margin: 0 0 12px;
+    padding: 8px 10px 8px 30px;
+    border-left: 3px solid #9aa9a2;
+    background: #e9eeeb;
+    color: #4c5a54;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.debug-entry {
+    padding: 1px 0;
+    overflow-wrap: anywhere;
+}
+
+.debug-entry[data-state="error"] {
+    color: #a3332a;
+    font-weight: 600;
 }
 
 .products {

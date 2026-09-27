@@ -28,8 +28,11 @@
                     <span>Load products</span>
                 </button>
             </header>
-            <p id="status" class="status" role="status" aria-live="polite">Select Load products to view the bookmark contents.</p>
-            <ul id="products" class="products" aria-label="Physical Products in Lids"></ul>
+            <p class="status" role="status" aria-live="polite">Waiting for dashboard initialization...</p>
+            <ol class="debug-log" aria-label="Widget progress log" aria-live="polite">
+                <li class="debug-entry">Waiting for the dashboard onLoad event.</li>
+            </ol>
+            <ul class="products" aria-label="Physical Products in Lids"></ul>
         </main>
         <script type="text/javascript">
             (function waitForWidget() {
@@ -39,15 +42,53 @@
                 }
 
                 widget.addEvent("onLoad", function () {
-                    require(["DS/WAFData/WAFData", "DS/i3DXCompassServices/i3DXCompassServices"], function (WAFData, i3DXCompassServices) {
-                        window.initializeLidsWidget(
-                            WAFData,
-                            i3DXCompassServices,
-                            widget.getValue("x3dPlatformId"),
-                            widget.getValue("SecurityContext"),
-                            widget.body
-                        );
-                    });
+                    var root = widget.body;
+                    var finished = false;
+                    var moduleTimer;
+
+                    window.reportLidsWidgetStatus(root, "Dashboard onLoad received. Loading platform modules...");
+                    moduleTimer = window.setTimeout(function () {
+                        if (!finished) {
+                            finished = true;
+                            window.reportLidsWidgetStatus(root, "Timed out while loading the 3DEXPERIENCE widget modules.", "error");
+                        }
+                    }, 30000);
+
+                    try {
+                        require(["DS/WAFData/WAFData", "DS/i3DXCompassServices/i3DXCompassServices"], function (WAFData, i3DXCompassServices) {
+                            if (finished) {
+                                return;
+                            }
+                            finished = true;
+                            window.clearTimeout(moduleTimer);
+                            window.reportLidsWidgetStatus(root, "Platform modules loaded. Initializing the widget...");
+
+                            try {
+                                window.initializeLidsWidget(
+                                    WAFData,
+                                    i3DXCompassServices,
+                                    widget.getValue("x3dPlatformId"),
+                                    widget.getValue("SecurityContext"),
+                                    root
+                                );
+                            } catch (error) {
+                                window.reportLidsWidgetStatus(root, "Widget initialization failed: " + (error.message || error), "error");
+                            }
+                        }, function (error) {
+                            if (finished) {
+                                return;
+                            }
+                            finished = true;
+                            window.clearTimeout(moduleTimer);
+                            window.reportLidsWidgetStatus(root, "Could not load 3DEXPERIENCE modules: " + (error.message || error), "error");
+                        });
+                    } catch (error) {
+                        if (!finished) {
+                            finished = true;
+                            window.clearTimeout(moduleTimer);
+                            window.reportLidsWidgetStatus(root, "Module loader failed: " + (error.message || error), "error");
+                        }
+                    }
                 });
             }());
         </script>
