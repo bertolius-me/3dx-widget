@@ -7,7 +7,7 @@ A minimal 3DEXPERIENCE UWA dashboard widget. Click **Load products** to find the
 1. Host this folder at a URL reachable by your 3DEXPERIENCE dashboard. Use HTTPS on a cloud platform.
 2. Add the hosted `index.html` URL as a custom widget in a trusted dashboard on the same platform that contains the bookmark.
 3. In the widget menu, set **Security Context** to the required `Role.Organization.CollabSpace` value (for example, `VPLMProjectLeader.MyCompany.Default`).
-4. Open the widget and click **Load products**.
+4. Open the widget and click **Load products**. Once products are loaded, click **Export PDF** to download a separately formatted product register.
 
 The widget resolves the current platform's 3DSpace URL through `i3DXCompassServices` and makes authenticated requests with `WAFData`. It is not intended to run standalone in a browser because those dashboard APIs are not available there.
 
@@ -18,3 +18,7 @@ The widget uses the documented `/resources/v1/modeler/dsbks/dsbks:Bookmark/searc
 The `Items2` response nests each item under `referencedObject`; the widget recognizes `VPMReference` as a Physical Product and uses its `relativePath` to fetch the Engineering Item with the `dsmveng:EngItemMask.Details` mask. It displays the returned name, title, revision, and description, with the identifier retained and used as a fallback if a detail lookup fails.
 
 The widget needs an authenticated, trusted dashboard session and permission to read the `Lids` bookmark and its contents.
+
+## PDF Export
+
+PDF export is generated in the browser from the loaded product data using locally bundled jsPDF 4.2.1 and jsPDF-AutoTable 5.0.8. The PDF uses a landscape table with product metadata, wrapped descriptions, a repeated report heading, and page numbers. No CDN or server-side PDF service is required. The corresponding MIT license texts are included in `scripts/vendor`.

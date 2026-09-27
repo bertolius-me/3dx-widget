@@ -328,6 +328,80 @@
         });
     }
 
+    function exportProductsPdf(products) {
+        var jsPdfLibrary = window.jspdf;
+        var autoTable = window.autoTable;
+        if (!jsPdfLibrary || !jsPdfLibrary.jsPDF || !autoTable) {
+            throw new Error("The bundled PDF libraries are unavailable.");
+        }
+
+        var doc = new jsPdfLibrary.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        var pageWidth = doc.internal.pageSize.getWidth();
+        var pageHeight = doc.internal.pageSize.getHeight();
+        var exportDate = new Date();
+        var dateLabel = exportDate.toLocaleDateString();
+        var filenameDate = exportDate.toISOString().slice(0, 10);
+
+        doc.setProperties({
+            title: "Lids Physical Product Register",
+            subject: "Physical Product metadata",
+            creator: "Lids Product Widget"
+        });
+
+        autoTable(doc, {
+            columns: [
+                { header: "#", dataKey: "number" },
+                { header: "Physical Product", dataKey: "name" },
+                { header: "Title", dataKey: "title" },
+                { header: "Revision", dataKey: "revision" },
+                { header: "ID", dataKey: "id" },
+                { header: "Description", dataKey: "description" }
+            ],
+            body: products.map(function (product, index) {
+                return {
+                    number: String(index + 1),
+                    name: product.name || "Not provided",
+                    title: product.title || "Not provided",
+                    revision: product.revision || "Not provided",
+                    id: product.id || "Not provided",
+                    description: product.description || "Not provided"
+                };
+            }),
+            theme: "grid",
+            margin: { top: 30, right: 12, bottom: 16, left: 12 },
+            styles: { font: "helvetica", fontSize: 8, cellPadding: 2.5, overflow: "linebreak", valign: "top" },
+            headStyles: { fillColor: [23, 107, 83], textColor: [255, 255, 255], fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [242, 246, 244] },
+            columnStyles: {
+                number: { cellWidth: 9, halign: "right" },
+                name: { cellWidth: 42, fontStyle: "bold" },
+                title: { cellWidth: 42 },
+                revision: { cellWidth: 20 },
+                id: { cellWidth: 48 },
+                description: { cellWidth: "auto" }
+            },
+            rowPageBreak: "avoid",
+            willDrawPage: function () {
+                doc.setTextColor(32, 42, 49);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(15);
+                doc.text("Lids | Physical Product Register", 12, 13);
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(8);
+                doc.setTextColor(93, 105, 101);
+                doc.text("Exported " + dateLabel + "  |  " + products.length + " Physical Product(s)", 12, 20);
+            },
+            didDrawPage: function (data) {
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(8);
+                doc.setTextColor(93, 105, 101);
+                doc.text("Page " + data.pageNumber, pageWidth - 12, pageHeight - 7, { align: "right" });
+            }
+        });
+
+        doc.save("lids-physical-products-" + filenameDate + ".pdf");
+    }
+
     async function loadProducts(WAFData, serviceUrl, securityContext, root) {
         var bookmarkParams = {
             "$searchStr": BOOKMARK_NAME,
@@ -363,11 +437,27 @@
 
     window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root) {
         var button = root.querySelector(".load-products");
+        var exportButton = root.querySelector(".export-pdf");
+        var loadedProducts = [];
 
         setStatus(root, "Widget initialized. Ready to load products.");
 
+        exportButton.addEventListener("click", function () {
+            if (loadedProducts.length === 0) {
+                return;
+            }
+            try {
+                exportProductsPdf(loadedProducts);
+                setStatus(root, "PDF export started for " + loadedProducts.length + " Physical Product(s).");
+            } catch (error) {
+                setStatus(root, "PDF export failed: " + describeError(error), "error");
+            }
+        });
+
         button.addEventListener("click", function () {
             button.disabled = true;
+            exportButton.disabled = true;
+            loadedProducts = [];
             renderProducts(root, []);
             setStatus(root, "Load products clicked.");
 
@@ -406,6 +496,8 @@
 
                         setStatus(root, "3DSpace URL resolved. Starting bookmark lookup...");
                         loadProducts(WAFData, serviceUrl, securityContext.trim(), root).then(function (result) {
+                            loadedProducts = result.products;
+                            exportButton.disabled = loadedProducts.length === 0;
                             renderProducts(root, result.products);
                             var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in Lids.";
                             if (result.detailResults.failedDetails > 0) {
@@ -413,6 +505,8 @@
                             }
                             setStatus(root, finalStatus);
                         }).catch(function (error) {
+                            loadedProducts = [];
+                            exportButton.disabled = true;
                             renderProducts(root, []);
                             setStatus(root, "Product loading stopped: " + describeError(error), "error");
                         }).finally(function () {

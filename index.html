@@ -11,6 +11,8 @@
         <meta name="author" content="3DX Widget" />
         <meta name="description" content="Lists Physical Products from the Lids bookmark." />
         <link rel="stylesheet" type="text/css" href="styles/widget.css" />
+        <script type="text/javascript" src="scripts/vendor/jspdf.umd.min.js"></script>
+        <script type="text/javascript" src="scripts/vendor/jspdf.plugin.autotable.min.js"></script>
         <script type="text/javascript" src="scripts/main.js"></script>
         <widget:preferences>
             <widget:preference type="text" name="SecurityContext" label="Security Context (Role.Organization.CollabSpace)" defaultValue="" />
@@ -84,6 +86,10 @@
                 </div>
                 <div class="widget-actions">
                     <button class="test-number-button" type="button">Generate test number</button>
+                    <button class="export-pdf" type="button" disabled="disabled">
+                        <span class="button-icon" aria-hidden="true">&#8681;</span>
+                        <span>Export PDF</span>
+                    </button>
                     <button class="load-products" type="button">
                         <span class="button-icon" aria-hidden="true">&#8635;</span>
                         <span>Load products</span>

@@ -85,6 +85,16 @@ button:hover {
     background: #e8eeea;
 }
 
+.export-pdf {
+    border-color: #176b53;
+    background: #ffffff;
+    color: #176b53;
+}
+
+.export-pdf:hover:not(:disabled) {
+    background: #e8eeea;
+}
+
 button:focus-visible {
     outline: 3px solid #93c8b6;
     outline-offset: 2px;
