@@ -230,8 +230,69 @@
             id: referencedObject.identifier || referencedObject.id || item.identifier || item.id || "",
             name: referencedObject.title || referencedObject.name || item.title || item.name || "",
             type: referencedObject.type || item.type || "Physical Product",
-            revision: referencedObject.revision || item.revision || ""
+            revision: referencedObject.revision || item.revision || "",
+            relativePath: referencedObject.relativePath || item.relativePath || ""
         };
+    }
+
+    function getEngineeringItemPath(serviceUrl, product) {
+        if (product.relativePath && product.relativePath.charAt(0) === "/") {
+            return product.relativePath;
+        }
+
+        if (product.relativePath) {
+            var relativeUrl;
+            var platformUrl;
+            try {
+                relativeUrl = new URL(product.relativePath);
+                platformUrl = new URL(serviceUrl);
+            } catch (error) {
+                relativeUrl = null;
+            }
+            if (relativeUrl && platformUrl && relativeUrl.origin === platformUrl.origin) {
+                return relativeUrl.pathname;
+            }
+        }
+
+        return "/resources/v1/modeler/dseng/dseng:EngItem/" + encodeURIComponent(product.id);
+    }
+
+    async function loadProductNames(WAFData, serviceUrl, securityContext, products, root) {
+        var loadedNames = 0;
+        var failedNames = 0;
+
+        for (var index = 0; index < products.length; index += 1) {
+            var product = products[index];
+            var path = getEngineeringItemPath(serviceUrl, product);
+            var params = { "$mask": "dsmveng:EngItemMask.Details" };
+
+            setStatus(root, "Loading name for product " + (index + 1) + " of " + products.length + ".");
+            try {
+                var response = await requestJson(
+                    WAFData,
+                    makeUrl(serviceUrl, path, params),
+                    securityContext,
+                    root,
+                    "Product details " + (index + 1) + " of " + products.length
+                );
+                var item = getMembers(response)[0];
+                var name = item && (item.name || item.title);
+
+                if (name) {
+                    product.name = name;
+                    product.revision = item.revision || product.revision;
+                    loadedNames += 1;
+                } else {
+                    failedNames += 1;
+                    setStatus(root, "Product " + product.id + " details did not include a name; showing its ID instead.", "error");
+                }
+            } catch (error) {
+                failedNames += 1;
+                setStatus(root, "Could not load the name for product " + product.id + "; showing its ID instead. " + describeError(error), "error");
+            }
+        }
+
+        return { loadedNames: loadedNames, failedNames: failedNames };
     }
 
     function getDisplayName(item) {
@@ -281,8 +342,14 @@
         var contents = await getBookmarkItems(WAFData, serviceUrl, bookmark.id, securityContext, root);
         setStatus(root, "Checking " + contents.length + " bookmark item(s) for Physical Products.");
         var products = contents.filter(isPhysicalProduct).map(normalizeProduct);
-        setStatus(root, "Found " + products.length + " Physical Product(s). Rendering results...");
-        return products;
+        setStatus(root, "Found " + products.length + " Physical Product(s). Loading product names...");
+        var nameResults = await loadProductNames(WAFData, serviceUrl, securityContext, products, root);
+        var nameStatus = "Loaded names for " + nameResults.loadedNames + " of " + products.length + " products.";
+        if (nameResults.failedNames > 0) {
+            nameStatus += " Showing IDs for " + nameResults.failedNames + " product(s).";
+        }
+        setStatus(root, nameStatus + " Rendering results...");
+        return { products: products, nameResults: nameResults };
     }
 
     window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root) {
@@ -329,15 +396,19 @@
                     }
 
                         setStatus(root, "3DSpace URL resolved. Starting bookmark lookup...");
-                        loadProducts(WAFData, serviceUrl, securityContext.trim(), root).then(function (products) {
-                        renderProducts(root, products);
-                        setStatus(root, products.length + (products.length === 1 ? " Physical Product" : " Physical Products") + " found in Lids.");
-                    }).catch(function (error) {
-                        renderProducts(root, []);
+                        loadProducts(WAFData, serviceUrl, securityContext.trim(), root).then(function (result) {
+                            renderProducts(root, result.products);
+                            var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in Lids.";
+                            if (result.nameResults.failedNames > 0) {
+                                finalStatus += " Names unavailable for " + result.nameResults.failedNames + "; their IDs are shown.";
+                            }
+                            setStatus(root, finalStatus);
+                        }).catch(function (error) {
+                            renderProducts(root, []);
                             setStatus(root, "Product loading stopped: " + describeError(error), "error");
-                    }).finally(function () {
-                        button.disabled = false;
-                    });
+                        }).finally(function () {
+                            button.disabled = false;
+                        });
                     }
                 });
             } catch (error) {
