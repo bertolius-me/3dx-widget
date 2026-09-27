@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:widget="http://www.netvibes.com/ns/">
+    <head>
+        <title>Lids Product List</title>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="apiVersion" content="1.0" />
+        <meta name="debugMode" content="true" />
+        <meta name="strictMode" content="false" />
+        <meta name="author" content="3DX Widget" />
+        <meta name="description" content="Lists Physical Products from the Lids bookmark." />
+        <link rel="stylesheet" type="text/css" href="styles/widget.css" />
+        <script type="text/javascript" src="scripts/main.js"></script>
+        <widget:preferences>
+            <widget:preference type="text" name="SecurityContext" label="Security Context (Role.Organization.CollabSpace)" defaultValue="" />
+        </widget:preferences>
+    </head>
+    <body>
+        <main class="widget" aria-labelledby="widget-title">
+            <header class="widget-header">
+                <div>
+                    <p class="eyebrow">BOOKMARK</p>
+                    <h1 id="widget-title">Lids</h1>
+                </div>
+                <button id="load-products" type="button">
+                    <span class="button-icon" aria-hidden="true">&#8635;</span>
+                    <span>Load products</span>
+                </button>
+            </header>
+            <p id="status" class="status" role="status" aria-live="polite">Select Load products to view the bookmark contents.</p>
+            <ul id="products" class="products" aria-label="Physical Products in Lids"></ul>
+        </main>
+        <script type="text/javascript">
+            (function waitForWidget() {
+                if (typeof widget === "undefined" || !widget.addEvent) {
+                    window.setTimeout(waitForWidget, 100);
+                    return;
+                }
+
+                require(["DS/WAFData/WAFData", "DS/i3DXCompassServices/i3DXCompassServices"], function (WAFData, i3DXCompassServices) {
+                    window.initializeLidsWidget(WAFData, i3DXCompassServices, widget.getValue("x3dPlatformId"), widget.getValue("SecurityContext"));
+                });
+            }());
+        </script>
+    </body>
+</html>

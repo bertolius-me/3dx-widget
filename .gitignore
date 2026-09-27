@@ -1,0 +1,24 @@
+*.txt
+
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+coverage/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Local OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
