@@ -328,9 +328,8 @@
         });
     }
 
-    function exportProductsPdf(products) {
-        var jsPdfLibrary = window.jspdf;
-        var autoTable = window.autoTable;
+    function exportProductsPdf(products, jsPdfLibrary, autoTableModule) {
+        var autoTable = autoTableModule && autoTableModule.autoTable;
         if (!jsPdfLibrary || !jsPdfLibrary.jsPDF || !autoTable) {
             throw new Error("The bundled PDF libraries are unavailable.");
         }
@@ -435,7 +434,7 @@
         return { products: products, detailResults: detailResults };
     }
 
-    window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root) {
+    window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root, jsPdfModule, autoTableModule) {
         var button = root.querySelector(".load-products");
         var exportButton = root.querySelector(".export-pdf");
         var loadedProducts = [];
@@ -447,7 +446,7 @@
                 return;
             }
             try {
-                exportProductsPdf(loadedProducts);
+                exportProductsPdf(loadedProducts, jsPdfModule, autoTableModule);
                 setStatus(root, "PDF export started for " + loadedProducts.length + " Physical Product(s).");
             } catch (error) {
                 setStatus(root, "PDF export failed: " + describeError(error), "error");

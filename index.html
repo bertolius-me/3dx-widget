@@ -11,8 +11,6 @@
         <meta name="author" content="3DX Widget" />
         <meta name="description" content="Lists Physical Products from the Lids bookmark." />
         <link rel="stylesheet" type="text/css" href="styles/widget.css" />
-        <script type="text/javascript" src="scripts/vendor/jspdf.umd.min.js"></script>
-        <script type="text/javascript" src="scripts/vendor/jspdf.plugin.autotable.min.js"></script>
         <script type="text/javascript" src="scripts/main.js"></script>
         <widget:preferences>
             <widget:preference type="text" name="SecurityContext" label="Security Context (Role.Organization.CollabSpace)" defaultValue="" />
@@ -39,7 +37,14 @@
                     }, 30000);
 
                     try {
-                        require(["DS/WAFData/WAFData", "DS/i3DXCompassServices/i3DXCompassServices"], function (WAFData, i3DXCompassServices) {
+                        var jsPdfUrl = new URL("scripts/vendor/jspdf.umd.min.js", document.baseURI).href;
+                        var autoTableUrl = new URL("scripts/vendor/jspdf.plugin.autotable.min.js", document.baseURI).href;
+                        require([
+                            "DS/WAFData/WAFData",
+                            "DS/i3DXCompassServices/i3DXCompassServices",
+                            jsPdfUrl,
+                            autoTableUrl
+                        ], function (WAFData, i3DXCompassServices, jsPdfModule, autoTableModule) {
                             if (finished) {
                                 return;
                             }
@@ -53,7 +58,9 @@
                                     i3DXCompassServices,
                                     widget.getValue("x3dPlatformId"),
                                     widget.getValue("SecurityContext"),
-                                    root
+                                    root,
+                                    jsPdfModule,
+                                    autoTableModule
                                 );
                             } catch (error) {
                                 window.reportLidsWidgetStatus(root, "Widget initialization failed: " + (error.message || error), "error");
@@ -64,7 +71,7 @@
                             }
                             finished = true;
                             window.clearTimeout(moduleTimer);
-                            window.reportLidsWidgetStatus(root, "Could not load 3DEXPERIENCE modules: " + (error.message || error), "error");
+                            window.reportLidsWidgetStatus(root, "Could not load required widget modules: " + (error.message || error), "error");
                         });
                     } catch (error) {
                         if (!finished) {
