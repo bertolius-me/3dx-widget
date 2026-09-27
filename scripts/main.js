@@ -228,7 +228,9 @@
         var referencedObject = item.referencedObject || item;
         return {
             id: referencedObject.identifier || referencedObject.id || item.identifier || item.id || "",
-            name: referencedObject.title || referencedObject.name || item.title || item.name || "",
+            name: referencedObject.name || item.name || "",
+            title: referencedObject.title || item.title || "",
+            description: referencedObject.description || item.description || "",
             type: referencedObject.type || item.type || "Physical Product",
             revision: referencedObject.revision || item.revision || "",
             relativePath: referencedObject.relativePath || item.relativePath || ""
@@ -257,16 +259,16 @@
         return "/resources/v1/modeler/dseng/dseng:EngItem/" + encodeURIComponent(product.id);
     }
 
-    async function loadProductNames(WAFData, serviceUrl, securityContext, products, root) {
-        var loadedNames = 0;
-        var failedNames = 0;
+    async function loadProductDetails(WAFData, serviceUrl, securityContext, products, root) {
+        var loadedDetails = 0;
+        var failedDetails = 0;
 
         for (var index = 0; index < products.length; index += 1) {
             var product = products[index];
             var path = getEngineeringItemPath(serviceUrl, product);
             var params = { "$mask": "dsmveng:EngItemMask.Details" };
 
-            setStatus(root, "Loading name for product " + (index + 1) + " of " + products.length + ".");
+            setStatus(root, "Loading details for product " + (index + 1) + " of " + products.length + ".");
             try {
                 var response = await requestJson(
                     WAFData,
@@ -276,27 +278,27 @@
                     "Product details " + (index + 1) + " of " + products.length
                 );
                 var item = getMembers(response)[0];
-                var name = item && (item.name || item.title);
 
-                if (name) {
-                    product.name = name;
+                if (item) {
+                    product.name = item.name || product.name;
+                    product.title = item.title || product.title;
+                    product.description = item.description || product.description;
                     product.revision = item.revision || product.revision;
-                    loadedNames += 1;
+                }
+
+                if (item && (product.name || product.title || product.revision || product.description)) {
+                    loadedDetails += 1;
                 } else {
-                    failedNames += 1;
-                    setStatus(root, "Product " + product.id + " details did not include a name; showing its ID instead.", "error");
+                    failedDetails += 1;
+                    setStatus(root, "Product " + product.id + " details did not include display fields; showing its ID instead.", "error");
                 }
             } catch (error) {
-                failedNames += 1;
-                setStatus(root, "Could not load the name for product " + product.id + "; showing its ID instead. " + describeError(error), "error");
+                failedDetails += 1;
+                setStatus(root, "Could not load details for product " + product.id + "; showing its ID instead. " + describeError(error), "error");
             }
         }
 
-        return { loadedNames: loadedNames, failedNames: failedNames };
-    }
-
-    function getDisplayName(item) {
-        return item.name || item.title || item.label || item.physicalid || item.id || "Unnamed Physical Product";
+        return { loadedDetails: loadedDetails, failedDetails: failedDetails };
     }
 
     function renderProducts(root, products) {
@@ -307,14 +309,21 @@
             var row = document.createElement("li");
             var name = document.createElement("span");
             var detail = document.createElement("span");
-            var details = [product.type, product.revision, product.id].filter(Boolean);
+            var description = document.createElement("p");
+            var details = [
+                "Title: " + (product.title || "Not provided"),
+                "Revision: " + (product.revision || "Not provided"),
+                "ID: " + (product.id || "Not provided")
+            ];
 
             row.className = "product";
             name.className = "product-name";
             detail.className = "product-detail";
-            name.textContent = getDisplayName(product);
+            description.className = "product-description";
+            name.textContent = "Name: " + (product.name || product.id || "Not provided");
             detail.textContent = details.join(" | ");
-            row.append(name, detail);
+            description.textContent = "Description: " + (product.description || "Not provided");
+            row.append(name, detail, description);
             list.appendChild(row);
         });
     }
@@ -342,14 +351,14 @@
         var contents = await getBookmarkItems(WAFData, serviceUrl, bookmark.id, securityContext, root);
         setStatus(root, "Checking " + contents.length + " bookmark item(s) for Physical Products.");
         var products = contents.filter(isPhysicalProduct).map(normalizeProduct);
-        setStatus(root, "Found " + products.length + " Physical Product(s). Loading product names...");
-        var nameResults = await loadProductNames(WAFData, serviceUrl, securityContext, products, root);
-        var nameStatus = "Loaded names for " + nameResults.loadedNames + " of " + products.length + " products.";
-        if (nameResults.failedNames > 0) {
-            nameStatus += " Showing IDs for " + nameResults.failedNames + " product(s).";
+        setStatus(root, "Found " + products.length + " Physical Product(s). Loading product details...");
+        var detailResults = await loadProductDetails(WAFData, serviceUrl, securityContext, products, root);
+        var detailStatus = "Loaded details for " + detailResults.loadedDetails + " of " + products.length + " products.";
+        if (detailResults.failedDetails > 0) {
+            detailStatus += " Showing IDs for " + detailResults.failedDetails + " product(s).";
         }
-        setStatus(root, nameStatus + " Rendering results...");
-        return { products: products, nameResults: nameResults };
+        setStatus(root, detailStatus + " Rendering results...");
+        return { products: products, detailResults: detailResults };
     }
 
     window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root) {
@@ -399,8 +408,8 @@
                         loadProducts(WAFData, serviceUrl, securityContext.trim(), root).then(function (result) {
                             renderProducts(root, result.products);
                             var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in Lids.";
-                            if (result.nameResults.failedNames > 0) {
-                                finalStatus += " Names unavailable for " + result.nameResults.failedNames + "; their IDs are shown.";
+                            if (result.detailResults.failedDetails > 0) {
+                                finalStatus += " Details unavailable for " + result.detailResults.failedDetails + "; their IDs are shown.";
                             }
                             setStatus(root, finalStatus);
                         }).catch(function (error) {

@@ -1,4 +1,5 @@
-*.txt
+# Ignore local AI files
+.ai/
 
 # Dependencies and generated output
 node_modules/
