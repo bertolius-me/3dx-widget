@@ -94,7 +94,6 @@
             try {
                 var options = {
                     method: requestOptions && requestOptions.method || "GET",
-                    type: "json",
                     headers: {
                         Accept: "application/json",
                         SecurityContext: securityContext
@@ -109,9 +108,16 @@
 
                 if (requestOptions) {
                     Object.assign(options.headers, requestOptions.headers || {});
+                    if (requestOptions.responseType) {
+                        options.responseType = requestOptions.responseType;
+                    } else {
+                        options.type = "json";
+                    }
                     if (Object.prototype.hasOwnProperty.call(requestOptions, "data")) {
                         options.data = requestOptions.data;
                     }
+                } else {
+                    options.type = "json";
                 }
                 WAFData.authenticatedRequest(url, options);
             } catch (error) {
@@ -312,6 +318,14 @@
     }
 
     function getAttributeValue(attributes, attributeName) {
+        if (attributes && !Array.isArray(attributes) && typeof attributes === "object") {
+            var objectKey = Object.keys(attributes).find(function (key) {
+                return key.toLowerCase() === attributeName.toLowerCase();
+            });
+            if (objectKey) {
+                return attributes[objectKey];
+            }
+        }
         if (!Array.isArray(attributes)) {
             return "";
         }
@@ -338,7 +352,7 @@
             return "";
         }
 
-        var urlKeys = ["url", "href", "uri", "fileUrl", "downloadUrl", "thumbnail_2d"];
+        var urlKeys = ["url", "href", "uri", "fileUrl", "downloadUrl", "path", "file", "content", "thumbnail_2d"];
         for (var index = 0; index < urlKeys.length; index += 1) {
             var imageUrl = getImageUrl(value[urlKeys[index]]);
             if (imageUrl) {
@@ -355,6 +369,9 @@
         if (response && response.data && Array.isArray(response.data.results)) {
             return response.data.results;
         }
+        if (response && Array.isArray(response.member)) {
+            return response.member;
+        }
         return [];
     }
 
@@ -370,11 +387,13 @@
     function getProductThumbnailMap(response) {
         var thumbnails = Object.create(null);
         getThumbnailResultEntries(response).forEach(function (entry) {
-            if (!entry || !Array.isArray(entry.attributes)) {
+            if (!entry) {
                 return;
             }
-            var physicalId = getProductIdFromAttributes(entry.attributes);
-            var thumbnailUrl = getImageUrl(getAttributeValue(entry.attributes, "thumbnail_2d"));
+            var attributes = entry.attributes || entry;
+            var physicalId = getProductIdFromAttributes(attributes) ||
+                String(entry.physicalid || entry.physicalId || entry.id || "").toLowerCase();
+            var thumbnailUrl = getImageUrl(getAttributeValue(attributes, "thumbnail_2d"));
             if (physicalId && thumbnailUrl) {
                 thumbnails[physicalId] = thumbnailUrl;
             }
@@ -394,19 +413,20 @@
         return "";
     }
 
-    async function loadProductThumbnails(WAFData, serviceUrl, securityContext, products, root) {
+    async function loadProductThumbnails(WAFData, serviceUrl, securityContext, tenant, products, root) {
         var productsWithIds = products.filter(function (product) {
             return product.id;
         });
         if (productsWithIds.length === 0) {
-            return { loadedThumbnails: 0, requestFailed: false };
+            return { loadedThumbnails: 0, requestFailed: false, objectUrls: [] };
         }
 
         setStatus(root, "Loading product image previews...");
         try {
             var response = await requestJson(
                 WAFData,
-                serviceUrl.replace(/\/$/, "") + THUMBNAIL_QUERY_PATH,
+                serviceUrl.replace(/\/$/, "") + THUMBNAIL_QUERY_PATH +
+                    (tenant ? "?tenant=" + encodeURIComponent(tenant) : ""),
                 securityContext,
                 root,
                 "Product image previews",
@@ -424,18 +444,55 @@
                     })
                 }
             );
+            if (!getThumbnailResultEntries(response).length) {
+                throw new Error("The Zone Query response contained no results. On cloud platforms, set the 3DSpace Tenant preference; also verify the Security Context.");
+            }
             var thumbnails = getProductThumbnailMap(response);
             var loadedThumbnails = 0;
+            var objectUrls = [];
+            if (Object.keys(thumbnails).length === 0) {
+                setStatus(root, "Zone Query returned no usable thumbnail_2d URLs. Confirm the products have thumbnails stored in FCS.");
+            }
             productsWithIds.forEach(function (product) {
                 product.thumbnailUrl = normalizeThumbnailUrl(thumbnails[String(product.id).toLowerCase()], serviceUrl);
-                if (product.thumbnailUrl) {
-                    loadedThumbnails += 1;
-                }
             });
-            return { loadedThumbnails: loadedThumbnails, requestFailed: false };
+
+            for (var index = 0; index < productsWithIds.length; index += 1) {
+                var imageProduct = productsWithIds[index];
+                if (!imageProduct.thumbnailUrl) {
+                    continue;
+                }
+                try {
+                    var imageBlob = await requestJson(
+                        WAFData,
+                        imageProduct.thumbnailUrl,
+                        securityContext,
+                        root,
+                        "Product image " + (index + 1) + " of " + productsWithIds.length,
+                        {
+                            responseType: "blob",
+                            headers: { Accept: "image/*" }
+                        }
+                    );
+                    if (
+                        !imageBlob ||
+                        imageBlob.size === 0 ||
+                        (imageBlob.type && imageBlob.type.indexOf("image/") !== 0 && imageBlob.type !== "application/octet-stream")
+                    ) {
+                        throw new Error("The thumbnail URL did not return an image.");
+                    }
+                    imageProduct.thumbnailUrl = URL.createObjectURL(imageBlob);
+                    objectUrls.push(imageProduct.thumbnailUrl);
+                    loadedThumbnails += 1;
+                } catch (error) {
+                    setStatus(root, "Could not load the image for product " + imageProduct.id + "; showing it without a preview. " + describeError(error), "error");
+                    imageProduct.thumbnailUrl = "";
+                }
+            }
+            return { loadedThumbnails: loadedThumbnails, requestFailed: false, objectUrls: objectUrls };
         } catch (error) {
             setStatus(root, "Product image previews could not be loaded; showing products without images. " + describeError(error), "error");
-            return { loadedThumbnails: 0, requestFailed: true };
+            return { loadedThumbnails: 0, requestFailed: true, objectUrls: [] };
         }
     }
 
@@ -564,7 +621,7 @@
         doc.save("misc-physical-products-" + filenameDate + ".pdf");
     }
 
-    async function loadProducts(WAFData, serviceUrl, securityContext, root) {
+    async function loadProducts(WAFData, serviceUrl, securityContext, tenant, root) {
         var bookmarkParams = {
             "$searchStr": BOOKMARK_NAME,
             "$mask": "dsbks:BksMask.Details"
@@ -593,15 +650,16 @@
         if (detailResults.failedDetails > 0) {
             detailStatus += " Showing IDs for " + detailResults.failedDetails + " product(s).";
         }
-        var thumbnailResults = await loadProductThumbnails(WAFData, serviceUrl, securityContext, products, root);
+        var thumbnailResults = await loadProductThumbnails(WAFData, serviceUrl, securityContext, tenant, products, root);
         setStatus(root, detailStatus + " Rendering results...");
         return { products: products, detailResults: detailResults, thumbnailResults: thumbnailResults };
     }
 
-    window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root, jsPdfModule, autoTableModule) {
+    window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, tenant, root, jsPdfModule, autoTableModule) {
         var button = root.querySelector(".load-products");
         var exportButton = root.querySelector(".export-pdf");
         var loadedProducts = [];
+        var loadedImageUrls = [];
 
         setStatus(root, "Widget initialized. Ready to load products.");
 
@@ -620,6 +678,10 @@
         button.addEventListener("click", function () {
             button.disabled = true;
             exportButton.disabled = true;
+            loadedImageUrls.forEach(function (imageUrl) {
+                URL.revokeObjectURL(imageUrl);
+            });
+            loadedImageUrls = [];
             loadedProducts = [];
             renderProducts(root, []);
             setStatus(root, "Load products clicked.");
@@ -658,8 +720,9 @@
                     }
 
                         setStatus(root, "3DSpace URL resolved. Starting bookmark lookup...");
-                        loadProducts(WAFData, serviceUrl, securityContext.trim(), root).then(function (result) {
+                        loadProducts(WAFData, serviceUrl, securityContext.trim(), tenant ? tenant.trim() : "", root).then(function (result) {
                             loadedProducts = result.products;
+                            loadedImageUrls = result.thumbnailResults.objectUrls;
                             exportButton.disabled = loadedProducts.length === 0;
                             renderProducts(root, result.products);
                             var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in " + BOOKMARK_NAME + ".";

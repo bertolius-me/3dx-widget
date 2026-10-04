@@ -20,13 +20,18 @@ body {
 }
 
 .widget {
+    display: flex;
     width: 100%;
-    min-height: 100vh;
+    height: 100vh;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
     padding: 18px;
 }
 
 .widget-header {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -111,6 +116,7 @@ button:disabled {
 }
 
 .status {
+    flex: 0 0 auto;
     margin: 14px 0 10px;
     color: #5d6965;
     font-size: 13px;
@@ -124,6 +130,7 @@ button:disabled {
 
 .number-test {
     display: flex;
+    flex: 0 0 auto;
     align-items: baseline;
     gap: 10px;
     margin-top: 14px;
@@ -149,6 +156,7 @@ button:disabled {
 }
 
 .debug-log {
+    flex: 0 0 auto;
     max-height: 132px;
     overflow: auto;
     margin: 0 0 12px;
@@ -172,6 +180,9 @@ button:disabled {
 
 .products {
     display: grid;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
     gap: 1px;
     margin: 0;
     padding: 0;
