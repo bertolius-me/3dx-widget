@@ -1,7 +1,7 @@
 (function () {
     "use strict";
 
-    var BOOKMARK_NAME = "Lids";
+    var BOOKMARK_NAME = "Misc";
     var SEARCH_PAGE_SIZE = 1000;
     var ITEMS_PAGE_SIZE = 50;
     var REQUEST_TIMEOUT_MS = 30000;
@@ -342,9 +342,9 @@
         var filenameDate = exportDate.toISOString().slice(0, 10);
 
         doc.setProperties({
-            title: "Lids Physical Product Register",
+            title: "Misc Physical Product Register",
             subject: "Physical Product metadata",
-            creator: "Lids Product Widget"
+            creator: "Misc Product Widget"
         });
 
         autoTable(doc, {
@@ -384,7 +384,7 @@
                 doc.setTextColor(32, 42, 49);
                 doc.setFont("helvetica", "bold");
                 doc.setFontSize(15);
-                doc.text("Lids | Physical Product Register", 12, 13);
+                doc.text("Misc | Physical Product Register", 12, 13);
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(8);
                 doc.setTextColor(93, 105, 101);
@@ -398,7 +398,7 @@
             }
         });
 
-        doc.save("lids-physical-products-" + filenameDate + ".pdf");
+        doc.save("misc-physical-products-" + filenameDate + ".pdf");
     }
 
     async function loadProducts(WAFData, serviceUrl, securityContext, root) {
@@ -417,10 +417,10 @@
             throw new Error('Could not find a bookmark named "' + BOOKMARK_NAME + '" that is visible to the current user.');
         }
         if (!bookmark.id) {
-            throw new Error("The bookmark search response did not include an id for Lids.");
+            throw new Error('The bookmark search response did not include an id for "' + BOOKMARK_NAME + '".');
         }
 
-        setStatus(root, "Found Lids. Loading its bookmark items...");
+        setStatus(root, "Found " + BOOKMARK_NAME + ". Loading its bookmark items...");
         var contents = await getBookmarkItems(WAFData, serviceUrl, bookmark.id, securityContext, root);
         setStatus(root, "Checking " + contents.length + " bookmark item(s) for Physical Products.");
         var products = contents.filter(isPhysicalProduct).map(normalizeProduct);
@@ -498,7 +498,7 @@
                             loadedProducts = result.products;
                             exportButton.disabled = loadedProducts.length === 0;
                             renderProducts(root, result.products);
-                            var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in Lids.";
+                            var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in " + BOOKMARK_NAME + ".";
                             if (result.detailResults.failedDetails > 0) {
                                 finalStatus += " Details unavailable for " + result.detailResults.failedDetails + "; their IDs are shown.";
                             }
