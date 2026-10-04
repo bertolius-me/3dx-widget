@@ -23,8 +23,20 @@
                     return;
                 }
 
+                var initializationStarted = false;
                 widget.addEvent("onLoad", function () {
-                    var root = widget.body;
+                    if (initializationStarted) {
+                        return;
+                    }
+                    var root = document.querySelector(".widget");
+                    if (!root && widget.body && typeof widget.body.querySelector === "function") {
+                        root = widget.body;
+                    }
+                    if (!root) {
+                        console.error("Could not find the widget DOM root.");
+                        return;
+                    }
+                    initializationStarted = true;
                     var finished = false;
                     var moduleTimer;
 
