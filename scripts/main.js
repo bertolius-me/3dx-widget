@@ -8,6 +8,7 @@
     var MAX_LOG_ENTRIES = 30;
     var BOOKMARK_SEARCH_PATH = "/resources/v1/modeler/dsbks/dsbks:Bookmark/search";
     var BOOKMARK_PATH = "/resources/v1/modeler/dsbks/dsbks:Bookmark";
+    var THUMBNAIL_QUERY_PATH = "/cvservlet/zonequeries";
 
     function describeError(error) {
         if (error && error.message) {
@@ -61,7 +62,7 @@
         });
     };
 
-    function requestJson(WAFData, url, securityContext, root, step) {
+    function requestJson(WAFData, url, securityContext, root, step, requestOptions) {
         return new Promise(function (resolve, reject) {
             var finished = false;
             var timer = window.setTimeout(function () {
@@ -91,8 +92,8 @@
 
             setStatus(root, step + " request sent.");
             try {
-                WAFData.authenticatedRequest(url, {
-                    method: "GET",
+                var options = {
+                    method: requestOptions && requestOptions.method || "GET",
                     type: "json",
                     headers: {
                         Accept: "application/json",
@@ -104,7 +105,15 @@
                     onTimeout: function () {
                         fail(new Error("The 3DEXPERIENCE request timed out."));
                     }
-                });
+                };
+
+                if (requestOptions) {
+                    Object.assign(options.headers, requestOptions.headers || {});
+                    if (Object.prototype.hasOwnProperty.call(requestOptions, "data")) {
+                        options.data = requestOptions.data;
+                    }
+                }
+                WAFData.authenticatedRequest(url, options);
             } catch (error) {
                 fail(error);
             }
@@ -233,7 +242,8 @@
             description: referencedObject.description || item.description || "",
             type: referencedObject.type || item.type || "Physical Product",
             revision: referencedObject.revision || item.revision || "",
-            relativePath: referencedObject.relativePath || item.relativePath || ""
+            relativePath: referencedObject.relativePath || item.relativePath || "",
+            thumbnailUrl: ""
         };
     }
 
@@ -301,12 +311,144 @@
         return { loadedDetails: loadedDetails, failedDetails: failedDetails };
     }
 
+    function getAttributeValue(attributes, attributeName) {
+        if (!Array.isArray(attributes)) {
+            return "";
+        }
+        var attribute = attributes.find(function (candidate) {
+            return String(candidate && candidate.name || "").toLowerCase() === attributeName.toLowerCase();
+        });
+        return attribute && attribute.value;
+    }
+
+    function getImageUrl(value) {
+        if (typeof value === "string") {
+            return value.trim();
+        }
+        if (!value || typeof value !== "object") {
+            return "";
+        }
+        if (Array.isArray(value)) {
+            for (var itemIndex = 0; itemIndex < value.length; itemIndex += 1) {
+                var arrayImageUrl = getImageUrl(value[itemIndex]);
+                if (arrayImageUrl) {
+                    return arrayImageUrl;
+                }
+            }
+            return "";
+        }
+
+        var urlKeys = ["url", "href", "uri", "fileUrl", "downloadUrl", "thumbnail_2d"];
+        for (var index = 0; index < urlKeys.length; index += 1) {
+            var imageUrl = getImageUrl(value[urlKeys[index]]);
+            if (imageUrl) {
+                return imageUrl;
+            }
+        }
+        return "";
+    }
+
+    function getThumbnailResultEntries(response) {
+        if (response && Array.isArray(response.results)) {
+            return response.results;
+        }
+        if (response && response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
+    }
+
+    function getProductIdFromAttributes(attributes) {
+        return String(
+            getAttributeValue(attributes, "physicalid") ||
+            getAttributeValue(attributes, "physicalId") ||
+            getAttributeValue(attributes, "identifier") ||
+            ""
+        ).toLowerCase();
+    }
+
+    function getProductThumbnailMap(response) {
+        var thumbnails = Object.create(null);
+        getThumbnailResultEntries(response).forEach(function (entry) {
+            if (!entry || !Array.isArray(entry.attributes)) {
+                return;
+            }
+            var physicalId = getProductIdFromAttributes(entry.attributes);
+            var thumbnailUrl = getImageUrl(getAttributeValue(entry.attributes, "thumbnail_2d"));
+            if (physicalId && thumbnailUrl) {
+                thumbnails[physicalId] = thumbnailUrl;
+            }
+        });
+        return thumbnails;
+    }
+
+    function normalizeThumbnailUrl(thumbnailUrl, serviceUrl) {
+        try {
+            var imageUrl = new URL(thumbnailUrl, serviceUrl);
+            if (imageUrl.protocol === "http:" || imageUrl.protocol === "https:") {
+                return imageUrl.href;
+            }
+        } catch (error) {
+            return "";
+        }
+        return "";
+    }
+
+    async function loadProductThumbnails(WAFData, serviceUrl, securityContext, products, root) {
+        var productsWithIds = products.filter(function (product) {
+            return product.id;
+        });
+        if (productsWithIds.length === 0) {
+            return { loadedThumbnails: 0, requestFailed: false };
+        }
+
+        setStatus(root, "Loading product image previews...");
+        try {
+            var response = await requestJson(
+                WAFData,
+                serviceUrl.replace(/\/$/, "") + THUMBNAIL_QUERY_PATH,
+                securityContext,
+                root,
+                "Product image previews",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    data: JSON.stringify({
+                        root_path_physicalid: productsWithIds.map(function (product) {
+                            return [product.id];
+                        }),
+                        label: "3dx-widget.product-thumbnails",
+                        select_bo: ["physicalid"],
+                        compute_select_bo: ["thumbnail_2d"],
+                        fcs_url_mode: "REDIRECT"
+                    })
+                }
+            );
+            var thumbnails = getProductThumbnailMap(response);
+            var loadedThumbnails = 0;
+            productsWithIds.forEach(function (product) {
+                product.thumbnailUrl = normalizeThumbnailUrl(thumbnails[String(product.id).toLowerCase()], serviceUrl);
+                if (product.thumbnailUrl) {
+                    loadedThumbnails += 1;
+                }
+            });
+            return { loadedThumbnails: loadedThumbnails, requestFailed: false };
+        } catch (error) {
+            setStatus(root, "Product image previews could not be loaded; showing products without images. " + describeError(error), "error");
+            return { loadedThumbnails: 0, requestFailed: true };
+        }
+    }
+
     function renderProducts(root, products) {
         var list = root.querySelector(".products");
         list.replaceChildren();
 
         products.forEach(function (product) {
             var row = document.createElement("li");
+            var preview = document.createElement("div");
+            var image = document.createElement("img");
+            var placeholder = document.createElement("span");
+            var content = document.createElement("div");
             var name = document.createElement("span");
             var detail = document.createElement("span");
             var description = document.createElement("p");
@@ -317,13 +459,34 @@
             ];
 
             row.className = "product";
+            preview.className = "product-preview";
+            image.className = "product-image";
+            image.alt = "Preview of " + (product.name || product.id || "Physical Product");
+            image.loading = "lazy";
+            image.hidden = true;
+            image.addEventListener("load", function () {
+                image.hidden = false;
+                placeholder.hidden = true;
+            });
+            placeholder.className = "product-image-placeholder";
+            placeholder.textContent = "No preview";
+            content.className = "product-content";
             name.className = "product-name";
             detail.className = "product-detail";
             description.className = "product-description";
             name.textContent = "Name: " + (product.name || product.id || "Not provided");
             detail.textContent = details.join(" | ");
             description.textContent = "Description: " + (product.description || "Not provided");
-            row.append(name, detail, description);
+            content.append(name, detail, description);
+            preview.append(image, placeholder);
+            image.addEventListener("error", function () {
+                image.hidden = true;
+                placeholder.hidden = false;
+            });
+            if (product.thumbnailUrl) {
+                image.src = product.thumbnailUrl;
+            }
+            row.append(preview, content);
             list.appendChild(row);
         });
     }
@@ -430,8 +593,9 @@
         if (detailResults.failedDetails > 0) {
             detailStatus += " Showing IDs for " + detailResults.failedDetails + " product(s).";
         }
+        var thumbnailResults = await loadProductThumbnails(WAFData, serviceUrl, securityContext, products, root);
         setStatus(root, detailStatus + " Rendering results...");
-        return { products: products, detailResults: detailResults };
+        return { products: products, detailResults: detailResults, thumbnailResults: thumbnailResults };
     }
 
     window.initializeLidsWidget = function (WAFData, compassServices, platformId, securityContext, root, jsPdfModule, autoTableModule) {
@@ -501,6 +665,11 @@
                             var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in " + BOOKMARK_NAME + ".";
                             if (result.detailResults.failedDetails > 0) {
                                 finalStatus += " Details unavailable for " + result.detailResults.failedDetails + "; their IDs are shown.";
+                            }
+                            if (result.thumbnailResults.requestFailed) {
+                                finalStatus += " Image previews could not be retrieved; see the progress log.";
+                            } else if (result.thumbnailResults.loadedThumbnails < result.products.length) {
+                                finalStatus += " Thumbnail links available for " + result.thumbnailResults.loadedThumbnails + " of " + result.products.length + " products.";
                             }
                             setStatus(root, finalStatus);
                         }).catch(function (error) {
