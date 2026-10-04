@@ -418,7 +418,7 @@
             return product.id;
         });
         if (productsWithIds.length === 0) {
-            return { loadedThumbnails: 0, requestFailed: false, objectUrls: [] };
+            return { thumbnailUrls: 0, requestFailed: false };
         }
 
         setStatus(root, "Loading product image previews...");
@@ -448,51 +448,20 @@
                 throw new Error("The Zone Query response contained no results. On cloud platforms, set the 3DSpace Tenant preference; also verify the Security Context.");
             }
             var thumbnails = getProductThumbnailMap(response);
-            var loadedThumbnails = 0;
-            var objectUrls = [];
+            var thumbnailUrls = 0;
             if (Object.keys(thumbnails).length === 0) {
                 setStatus(root, "Zone Query returned no usable thumbnail_2d URLs. Confirm the products have thumbnails stored in FCS.");
             }
             productsWithIds.forEach(function (product) {
                 product.thumbnailUrl = normalizeThumbnailUrl(thumbnails[String(product.id).toLowerCase()], serviceUrl);
+                if (product.thumbnailUrl) {
+                    thumbnailUrls += 1;
+                }
             });
-
-            for (var index = 0; index < productsWithIds.length; index += 1) {
-                var imageProduct = productsWithIds[index];
-                if (!imageProduct.thumbnailUrl) {
-                    continue;
-                }
-                try {
-                    var imageBlob = await requestJson(
-                        WAFData,
-                        imageProduct.thumbnailUrl,
-                        securityContext,
-                        root,
-                        "Product image " + (index + 1) + " of " + productsWithIds.length,
-                        {
-                            responseType: "blob",
-                            headers: { Accept: "image/*" }
-                        }
-                    );
-                    if (
-                        !imageBlob ||
-                        imageBlob.size === 0 ||
-                        (imageBlob.type && imageBlob.type.indexOf("image/") !== 0 && imageBlob.type !== "application/octet-stream")
-                    ) {
-                        throw new Error("The thumbnail URL did not return an image.");
-                    }
-                    imageProduct.thumbnailUrl = URL.createObjectURL(imageBlob);
-                    objectUrls.push(imageProduct.thumbnailUrl);
-                    loadedThumbnails += 1;
-                } catch (error) {
-                    setStatus(root, "Could not load the image for product " + imageProduct.id + "; showing it without a preview. " + describeError(error), "error");
-                    imageProduct.thumbnailUrl = "";
-                }
-            }
-            return { loadedThumbnails: loadedThumbnails, requestFailed: false, objectUrls: objectUrls };
+            return { thumbnailUrls: thumbnailUrls, requestFailed: false };
         } catch (error) {
             setStatus(root, "Product image previews could not be loaded; showing products without images. " + describeError(error), "error");
-            return { loadedThumbnails: 0, requestFailed: true, objectUrls: [] };
+            return { thumbnailUrls: 0, requestFailed: true };
         }
     }
 
@@ -539,6 +508,7 @@
             image.addEventListener("error", function () {
                 image.hidden = true;
                 placeholder.hidden = false;
+                setStatus(root, "Could not display the preview for product " + (product.id || product.name) + ".", "error");
             });
             if (product.thumbnailUrl) {
                 image.src = product.thumbnailUrl;
@@ -659,7 +629,6 @@
         var button = root.querySelector(".load-products");
         var exportButton = root.querySelector(".export-pdf");
         var loadedProducts = [];
-        var loadedImageUrls = [];
 
         setStatus(root, "Widget initialized. Ready to load products.");
 
@@ -678,10 +647,6 @@
         button.addEventListener("click", function () {
             button.disabled = true;
             exportButton.disabled = true;
-            loadedImageUrls.forEach(function (imageUrl) {
-                URL.revokeObjectURL(imageUrl);
-            });
-            loadedImageUrls = [];
             loadedProducts = [];
             renderProducts(root, []);
             setStatus(root, "Load products clicked.");
@@ -722,7 +687,6 @@
                         setStatus(root, "3DSpace URL resolved. Starting bookmark lookup...");
                         loadProducts(WAFData, serviceUrl, securityContext.trim(), tenant ? tenant.trim() : "", root).then(function (result) {
                             loadedProducts = result.products;
-                            loadedImageUrls = result.thumbnailResults.objectUrls;
                             exportButton.disabled = loadedProducts.length === 0;
                             renderProducts(root, result.products);
                             var finalStatus = result.products.length + (result.products.length === 1 ? " Physical Product" : " Physical Products") + " found in " + BOOKMARK_NAME + ".";
@@ -731,8 +695,8 @@
                             }
                             if (result.thumbnailResults.requestFailed) {
                                 finalStatus += " Image previews could not be retrieved; see the progress log.";
-                            } else if (result.thumbnailResults.loadedThumbnails < result.products.length) {
-                                finalStatus += " Thumbnail links available for " + result.thumbnailResults.loadedThumbnails + " of " + result.products.length + " products.";
+                            } else if (result.thumbnailResults.thumbnailUrls < result.products.length) {
+                                finalStatus += " Thumbnail URLs available for " + result.thumbnailResults.thumbnailUrls + " of " + result.products.length + " products.";
                             }
                             setStatus(root, finalStatus);
                         }).catch(function (error) {
